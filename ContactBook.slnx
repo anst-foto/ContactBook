@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/git/">
+    <File Path=".gitattributes"/>
+    <File Path=".gitignore"/>
+  </Folder>
+  <Folder Name="/others/">
+    <File Path=".editorconfig"/>
+  </Folder>
+</Solution>
