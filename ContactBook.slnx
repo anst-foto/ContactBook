@@ -11,4 +11,5 @@
   <Folder Name="/others/">
     <File Path=".editorconfig" />
   </Folder>
+  <Project Path="ContactBook.WebApi/ContactBook.WebApi.csproj" />
 </Solution>

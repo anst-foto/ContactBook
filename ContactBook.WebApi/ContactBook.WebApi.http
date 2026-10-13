@@ -1,0 +1,5 @@
+@BaseUrl = http://localhost:5099
+
+GET {{BaseUrl}}/
+
+###
