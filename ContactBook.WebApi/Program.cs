@@ -7,30 +7,35 @@ using System.Threading;
 
 using ContactBook.WebApi.DataBase;
 using ContactBook.WebApi;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
 using NLog.Extensions.Logging;
+
 using Npgsql;
 
 #region Builder
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddNLog(builder.Configuration);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultDocker")
-    ?? builder.Configuration.GetConnectionString("Default")
-    ?? throw new InvalidOperationException("Не задана строка подключения (ConnectionStrings:DefaultDocker).");
+string connectionString = builder.Configuration.GetConnectionString("DefaultDocker")
+                          ?? builder.Configuration.GetConnectionString("Default")
+                          ?? throw new InvalidOperationException(
+                              "Не задана строка подключения (ConnectionStrings:DefaultDocker).");
 
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+NpgsqlDataSourceBuilder dataSourceBuilder = new(connectionString);
 dataSourceBuilder.MapEnum<ContactType>(ContactModelConfiguration.EnumTypeName);
-var dataSource = dataSourceBuilder.Build();
+NpgsqlDataSource dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddDbContext<DataBaseContext>(options =>
     options.UseNpgsql(dataSource, npgsql =>
@@ -51,9 +56,9 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 
 #region Application
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
-var runMigrations = builder.Configuration.GetValue("RunMigrations", defaultValue: true);
+bool runMigrations = builder.Configuration.GetValue("RunMigrations", true);
 if (runMigrations)
 {
     await app.Services.MigrateIfNeededAsync();
@@ -72,211 +77,206 @@ app.MapHealthChecks("/health");
 
 const int MinShortIdLength = 4;
 const int ShortIdLength = 8;
-var hexRegex = MyRegex();
+Regex hexRegex = MyRegex();
 
-var contacts = app
+RouteGroupBuilder contacts = app
     .MapGroup("/api/v1/contacts")
     .WithTags("Contacts");
 
 contacts.MapGet("/", async (DataBaseContext db, string? search, CancellationToken ct) =>
-{
-    var query = db.Contacts.AsNoTracking();
-
-    if (!string.IsNullOrWhiteSpace(search))
     {
-        var pattern = $"%{search.Trim()}%";
-        query = query.Where(c =>
-            EF.Functions.ILike(c.Name, pattern) ||
-            EF.Functions.ILike(c.Contact, pattern));
-    }
+        IQueryable<ContactModel> query = db.Contacts.AsNoTracking();
 
-    var items = await query
-        .OrderBy(c => c.Name)
-        .ThenBy(c => c.Id)
-        .Select(c => new ContactResponse(
-            c.Id,
-            c.Id.ToString("N").Substring(0, ShortIdLength),
-            c.Name,
-            c.Contact,
-            c.Type))
-        .ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            string pattern = $"%{search.Trim()}%";
+            query = query.Where(c =>
+                EF.Functions.ILike(c.Name, pattern) ||
+                EF.Functions.ILike(c.Contact, pattern));
+        }
 
-    return Results.Ok(items);
-})
-.WithName("GetContacts")
-.WithSummary("Список контактов с поиском по имени или контакту")
-.Produces<IReadOnlyList<ContactResponse>>(StatusCodes.Status200OK);
+        List<ContactResponse> items = await query
+            .OrderBy(c => c.Name)
+            .ThenBy(c => c.Id)
+            .Select(c => new ContactResponse(
+                c.Id,
+                c.Id.ToString("N").Substring(0, ShortIdLength),
+                c.Name,
+                c.Contact,
+                c.Type))
+            .ToListAsync(ct);
+
+        return Results.Ok(items);
+    })
+    .WithName("GetContacts")
+    .WithSummary("Список контактов с поиском по имени или контакту")
+    .Produces<IReadOnlyList<ContactResponse>>(StatusCodes.Status200OK);
 
 contacts.MapGet("/{id:guid}", async (Guid id, DataBaseContext db, CancellationToken ct) =>
-{
-    var contact = await db.Contacts.AsNoTracking().SingleOrDefaultAsync(c => c.Id == id, ct);
-    return contact is null
-        ? Results.NotFound()
-        : Results.Ok(ToResponse(contact, ShortIdLength));
-})
-.WithName("GetContactById")
-.WithSummary("Получить контакт по полному GUID")
-.Produces<ContactResponse>(StatusCodes.Status200OK)
-.ProducesProblem(StatusCodes.Status404NotFound);
+    {
+        ContactModel? contact = await db.Contacts.AsNoTracking().SingleOrDefaultAsync(c => c.Id == id, ct);
+        return contact is null
+            ? Results.NotFound()
+            : Results.Ok(ToResponse(contact, ShortIdLength));
+    })
+    .WithName("GetContactById")
+    .WithSummary("Получить контакт по полному GUID")
+    .Produces<ContactResponse>(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status404NotFound);
 
 contacts.MapGet("/by-short-id/{shortId}", async (string shortId, DataBaseContext db, CancellationToken ct) =>
-{
-    if (string.IsNullOrWhiteSpace(shortId))
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
+        if (string.IsNullOrWhiteSpace(shortId))
         {
-            ["shortId"] = ["Обязательное поле."]
-        });
-    }
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["shortId"] = ["Обязательное поле."] });
+        }
 
-    var normalized = shortId.Replace("-", string.Empty).Trim().ToLowerInvariant();
+        string normalized = shortId.Replace("-", string.Empty).Trim().ToLowerInvariant();
 
-    if (normalized.Length < MinShortIdLength)
-    {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
+        if (normalized.Length < MinShortIdLength)
         {
-            ["shortId"] = [$"Минимальная длина — {MinShortIdLength} hex-символа."]
-        });
-    }
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["shortId"] = [$"Минимальная длина — {MinShortIdLength} hex-символа."]
+            });
+        }
 
-    if (!hexRegex.IsMatch(normalized))
-    {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
+        if (!hexRegex.IsMatch(normalized))
         {
-            ["shortId"] = ["Допустимы только hex-символы 0-9, a-f (дефисы игнорируются)."]
-        });
-    }
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["shortId"] = ["Допустимы только hex-символы 0-9, a-f (дефисы игнорируются)."]
+            });
+        }
 
-    var matches = await db.Contacts
-        .AsNoTracking()
-        .Where(c => c.Id.ToString("N").StartsWith(normalized, StringComparison.CurrentCultureIgnoreCase))
-        .Take(2)
-        .ToListAsync(ct);
+        List<ContactModel> matches = await db.Contacts
+            .AsNoTracking()
+            .Where(c => c.Id.ToString("N").StartsWith(normalized, StringComparison.CurrentCultureIgnoreCase))
+            .Take(2)
+            .ToListAsync(ct);
 
-    return matches.Count switch
-    {
-        0 => Results.NotFound(),
-        1 => Results.Ok(ToResponse(matches[0], ShortIdLength)),
-        _ => Results.Conflict(new
+        return matches.Count switch
         {
-            message = "Короткий ID неоднозначен, найдено несколько контактов.",
-            hint = "Уточните префикс или используйте полный GUID."
-        })
-    };
-})
-.WithName("GetContactByShortId")
-.WithSummary("Получить контакт по короткому ID (hex-префикс GUID, минимум 4 символа)")
-.Produces<ContactResponse>(StatusCodes.Status200OK)
-.ProducesValidationProblem()
-.ProducesProblem(StatusCodes.Status404NotFound)
-.ProducesProblem(StatusCodes.Status409Conflict);
+            0 => Results.NotFound(),
+            1 => Results.Ok(ToResponse(matches[0], ShortIdLength)),
+            _ => Results.Conflict(new
+            {
+                message = "Короткий ID неоднозначен, найдено несколько контактов.",
+                hint = "Уточните префикс или используйте полный GUID."
+            })
+        };
+    })
+    .WithName("GetContactByShortId")
+    .WithSummary("Получить контакт по короткому ID (hex-префикс GUID, минимум 4 символа)")
+    .Produces<ContactResponse>(StatusCodes.Status200OK)
+    .ProducesValidationProblem()
+    .ProducesProblem(StatusCodes.Status404NotFound)
+    .ProducesProblem(StatusCodes.Status409Conflict);
 
 contacts.MapPost("/", async (ContactCreateRequest request, DataBaseContext db, CancellationToken ct) =>
-{
-    var errors = Validate(request.Name, request.Contact);
-    if (errors.Count > 0)
     {
-        return Results.ValidationProblem(errors);
-    }
+        Dictionary<string, string[]> errors = Validate(request.Name, request.Contact);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
 
-    var entity = new ContactModel
-    {
-        Name = request.Name.Trim(),
-        Contact = request.Contact.Trim(),
-        Type = request.Type
-    };
+        ContactModel entity = new()
+        {
+            Name = request.Name.Trim(), Contact = request.Contact.Trim(), Type = request.Type
+        };
 
-    db.Contacts.Add(entity);
+        db.Contacts.Add(entity);
 
-    try
-    {
-        await db.SaveChangesAsync(ct);
-    }
-    catch (DbUpdateException ex) when (IsUniqueViolation(ex))
-    {
-        return Results.Conflict(new { message = "Контакт с таким значением и типом уже существует." });
-    }
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            return Results.Conflict(new { message = "Контакт с таким значением и типом уже существует." });
+        }
 
-    return Results.CreatedAtRoute(
-        routeName: "GetContactById",
-        routeValues: new { id = entity.Id },
-        value: ToResponse(entity, ShortIdLength));
-})
-.WithName("CreateContact")
-.WithSummary("Создать контакт")
-.Produces<ContactResponse>(StatusCodes.Status201Created)
-.ProducesValidationProblem()
-.ProducesProblem(StatusCodes.Status409Conflict);
+        return Results.CreatedAtRoute(
+            "GetContactById",
+            new { id = entity.Id },
+            ToResponse(entity, ShortIdLength));
+    })
+    .WithName("CreateContact")
+    .WithSummary("Создать контакт")
+    .Produces<ContactResponse>(StatusCodes.Status201Created)
+    .ProducesValidationProblem()
+    .ProducesProblem(StatusCodes.Status409Conflict);
 
 contacts.MapPut("/", async (ContactUpdateRequest request, DataBaseContext db, CancellationToken ct) =>
-{
-    if (request.Id == Guid.Empty)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
+        if (request.Id == Guid.Empty)
         {
-            ["id"] = ["Идентификатор обязателен и не может быть пустым (Guid.Empty)."]
-        });
-    }
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["id"] = ["Идентификатор обязателен и не может быть пустым (Guid.Empty)."]
+            });
+        }
 
-    var errors = Validate(request.Name, request.Contact);
-    if (errors.Count > 0)
-    {
-        return Results.ValidationProblem(errors);
-    }
+        Dictionary<string, string[]> errors = Validate(request.Name, request.Contact);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
 
-    var entity = await db.Contacts.FirstOrDefaultAsync(c => c.Id == request.Id, ct);
-    if (entity is null)
-    {
-        return Results.NotFound();
-    }
+        ContactModel? entity = await db.Contacts.FirstOrDefaultAsync(c => c.Id == request.Id, ct);
+        if (entity is null)
+        {
+            return Results.NotFound();
+        }
 
-    entity.Name = request.Name.Trim();
-    entity.Contact = request.Contact.Trim();
-    entity.Type = request.Type;
+        entity.Name = request.Name.Trim();
+        entity.Contact = request.Contact.Trim();
+        entity.Type = request.Type;
 
-    try
-    {
-        await db.SaveChangesAsync(ct);
-    }
-    catch (DbUpdateException ex) when (IsUniqueViolation(ex))
-    {
-        return Results.Conflict(new { message = "Контакт с таким значением и типом уже существует." });
-    }
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            return Results.Conflict(new { message = "Контакт с таким значением и типом уже существует." });
+        }
 
-    return Results.Ok(ToResponse(entity, ShortIdLength));
-})
-.WithName("UpdateContact")
-.WithSummary("Обновить контакт (ID передаётся в теле запроса)")
-.Produces<ContactResponse>(StatusCodes.Status200OK)
-.ProducesValidationProblem()
-.ProducesProblem(StatusCodes.Status404NotFound)
-.ProducesProblem(StatusCodes.Status409Conflict);
+        return Results.Ok(ToResponse(entity, ShortIdLength));
+    })
+    .WithName("UpdateContact")
+    .WithSummary("Обновить контакт (ID передаётся в теле запроса)")
+    .Produces<ContactResponse>(StatusCodes.Status200OK)
+    .ProducesValidationProblem()
+    .ProducesProblem(StatusCodes.Status404NotFound)
+    .ProducesProblem(StatusCodes.Status409Conflict);
 
 contacts.MapDelete("/{id:guid}", async (Guid id, DataBaseContext db, CancellationToken ct) =>
-{
-    if (id == Guid.Empty)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
+        if (id == Guid.Empty)
         {
-            ["id"] = ["Идентификатор не может быть пустым (Guid.Empty)."]
-        });
-    }
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["id"] = ["Идентификатор не может быть пустым (Guid.Empty)."]
+            });
+        }
 
-    var entity = await db.Contacts.FirstOrDefaultAsync(c => c.Id == id, ct);
-    if (entity is null)
-    {
-        return Results.NotFound();
-    }
+        ContactModel? entity = await db.Contacts.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (entity is null)
+        {
+            return Results.NotFound();
+        }
 
-    db.Contacts.Remove(entity);
-    await db.SaveChangesAsync(ct);
-    return Results.NoContent();
-})
-.WithName("DeleteContact")
-.WithSummary("Удалить контакт")
-.Produces(StatusCodes.Status204NoContent)
-.ProducesValidationProblem()
-.ProducesProblem(StatusCodes.Status404NotFound);
+        db.Contacts.Remove(entity);
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
+    })
+    .WithName("DeleteContact")
+    .WithSummary("Удалить контакт")
+    .Produces(StatusCodes.Status204NoContent)
+    .ProducesValidationProblem()
+    .ProducesProblem(StatusCodes.Status404NotFound);
 
 #endregion
 
@@ -290,7 +290,7 @@ await app.RunAsync();
 
 static Dictionary<string, string[]> Validate(string? name, string? contact)
 {
-    var errors = new Dictionary<string, string[]>();
+    Dictionary<string, string[]> errors = new();
 
     if (string.IsNullOrWhiteSpace(name))
     {
@@ -313,29 +313,34 @@ static Dictionary<string, string[]> Validate(string? name, string? contact)
     return errors;
 }
 
-static ContactResponse ToResponse(ContactModel c, int shortIdLength) => new(
-    Id: c.Id,
-    ShortId: c.Id.ToString("N")[..shortIdLength],
-    Name: c.Name,
-    Contact: c.Contact,
-    Type: c.Type);
+static ContactResponse ToResponse(ContactModel c, int shortIdLength)
+{
+    return new ContactResponse(
+        c.Id,
+        c.Id.ToString("N")[..shortIdLength],
+        c.Name,
+        c.Contact,
+        c.Type);
+}
 
-static bool IsUniqueViolation(DbUpdateException ex) =>
-    ex.InnerException is PostgresException { SqlState: "23505" };
+static bool IsUniqueViolation(DbUpdateException ex)
+{
+    return ex.InnerException is PostgresException { SqlState: "23505" };
+}
 
 #endregion
 
 #region DTOs
 
-sealed record ContactCreateRequest(string Name, string Contact, ContactType Type);
+internal sealed record ContactCreateRequest(string Name, string Contact, ContactType Type);
 
-sealed record ContactUpdateRequest(Guid Id, string Name, string Contact, ContactType Type);
+internal sealed record ContactUpdateRequest(Guid Id, string Name, string Contact, ContactType Type);
 
-sealed record ContactResponse(Guid Id, string ShortId, string Name, string Contact, ContactType Type);
+internal sealed record ContactResponse(Guid Id, string ShortId, string Name, string Contact, ContactType Type);
 
 #endregion
 
-partial class Program
+internal partial class Program
 {
     [GeneratedRegex("^[0-9a-f]+$", RegexOptions.Compiled)]
     private static partial Regex MyRegex();

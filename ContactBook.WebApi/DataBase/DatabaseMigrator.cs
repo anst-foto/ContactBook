@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,13 +41,13 @@ public static class DatabaseMigrator
         this IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
-        using var scope = services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<DataBaseContext>();
-        var logger = scope.ServiceProvider
+        using IServiceScope scope = services.CreateScope();
+        DataBaseContext db = scope.ServiceProvider.GetRequiredService<DataBaseContext>();
+        ILogger logger = scope.ServiceProvider
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger("DatabaseMigrator");
 
-        var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken))
+        List<string> pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken))
             .ToList();
 
         if (pending.Count == 0)

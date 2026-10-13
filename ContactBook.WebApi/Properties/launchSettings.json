@@ -11,7 +11,6 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
@@ -22,7 +21,6 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-
     "Container (Dockerfile)": {
       "commandName": "Docker",
       "launchBrowser": true,
@@ -35,7 +33,6 @@
       "useSSL": false,
       "httpPort": 5080
     },
-
     "Docker Compose": {
       "commandName": "DockerCompose",
       "commandVersion": "1.0",

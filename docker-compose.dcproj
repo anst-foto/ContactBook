@@ -11,12 +11,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="docker-compose.yml" />
-        <None Include="docker-compose.override.yml" />
-        <None Include=".env" />
-        <None Include=".env.example" />
-        <None Include=".dockerignore" />
-        <None Include="initdb\**\*" />
+        <None Include="docker-compose.yml"/>
+        <None Include="docker-compose.override.yml"/>
+        <None Include=".env"/>
+        <None Include=".env.example"/>
+        <None Include=".dockerignore"/>
+        <None Include="initdb\**\*"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -30,5 +30,5 @@
         </ProjectReference>
     </ItemGroup>
 
-    <Import Project="$(MSBuildToolsPath)\Microsoft.Common.props" />
+    <Import Project="$(MSBuildToolsPath)\Microsoft.Common.props"/>
 </Project>

@@ -32,24 +32,16 @@ public static class SwaggerExtensions
                 Description =
                     "API контактной книги: хранение и управление контактами (email/телефон). " +
                     "Все эндпоинты работают поверх PostgreSQL через EF Core.",
-                Contact = new OpenApiContact
-                {
-                    Name = "ContactBook team",
-                    Email = "team@example.com"
-                },
-                License = new OpenApiLicense
-                {
-                    Name = "MIT",
-                    Url = new Uri("https://opensource.org/licenses/MIT")
-                }
+                Contact = new OpenApiContact { Name = "ContactBook team", Email = "team@example.com" },
+                License = new OpenApiLicense { Name = "MIT", Url = new Uri("https://opensource.org/licenses/MIT") }
             });
 
             // --- XML-комментарии из сборки ---
-            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            string xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            string xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
             if (File.Exists(xmlPath))
             {
-                options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+                options.IncludeXmlComments(xmlPath, true);
             }
 
             // --- Enum как строка (Email, Phone вместо 0, 1) ---
@@ -79,11 +71,11 @@ public static class SwaggerExtensions
         {
             options.SwaggerEndpoint("/swagger/v1/swagger.json", "ContactBook API v1");
             options.DocumentTitle = "ContactBook API";
-            options.DisplayRequestDuration();     // показывает время ответа
-            options.EnableTryItOutByDefault();    // кнопка Try it out активна сразу
-            options.EnableDeepLinking();          // прямые ссылки на эндпоинты
-            options.EnableFilter();               // поиск по эндпоинтам
-            options.RoutePrefix = "swagger";      // UI по /swagger, JSON по /swagger/v1/swagger.json
+            options.DisplayRequestDuration(); // показывает время ответа
+            options.EnableTryItOutByDefault(); // кнопка Try it out активна сразу
+            options.EnableDeepLinking(); // прямые ссылки на эндпоинты
+            options.EnableFilter(); // поиск по эндпоинтам
+            options.RoutePrefix = "swagger"; // UI по /swagger, JSON по /swagger/v1/swagger.json
         });
 
         return app;
