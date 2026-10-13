@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" Sdk="Microsoft.Docker.Sdk">
+
+    <PropertyGroup Label="Globals">
+        <ProjectVersion>2.1</ProjectVersion>
+        <DockerTargetOS>Linux</DockerTargetOS>
+        <DockerPublishLocally>False</DockerPublishLocally>
+        <ProjectGuid>d3e8a1f4-2c4b-4a8e-9c1b-7f5e2d8a3b6c</ProjectGuid>
+        <!-- Имя решения — совпадает с именем .sln без расширения -->
+        <DockerComposeProjectName>ContactBook</DockerComposeProjectName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="docker-compose.yml" />
+        <None Include="docker-compose.override.yml" />
+        <None Include=".env" />
+        <None Include=".env.example" />
+        <None Include=".dockerignore" />
+        <None Include="initdb\**\*" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="ContactBook.WebApi\ContactBook.WebApi.csproj">
+            <!--
+              Метаданные для Container Tools: какой сервис в compose
+              соответствует этому проекту, и как он собирается.
+            -->
+            <DockerComposeServiceName>api</DockerComposeServiceName>
+            <DockerComposeProjectName>ContactBook</DockerComposeProjectName>
+        </ProjectReference>
+    </ItemGroup>
+
+    <Import Project="$(MSBuildToolsPath)\Microsoft.Common.props" />
+</Project>

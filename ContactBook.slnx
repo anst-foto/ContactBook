@@ -3,6 +3,7 @@
     <File Path=".dockerignore" />
     <File Path=".env" />
     <File Path=".env.example" />
+    <File Path="docker-compose.dcproj" />
     <File Path="docker-compose.yml" />
     <File Path="Dockerfile" />
   </Folder>
@@ -14,4 +15,5 @@
     <File Path=".editorconfig" />
   </Folder>
   <Project Path="ContactBook.WebApi/ContactBook.WebApi.csproj" />
+  <Project Path="docker-compose.dcproj" Type="{E53339B2-1760-4266-BCC7-CA923CBCF16C}" />
 </Solution>

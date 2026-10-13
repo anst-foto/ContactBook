@@ -4,9 +4,10 @@ services:
     image: postgres:18
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-contactbook_db}
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_USER: ${POSTGRES_USER:-contactbook_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
+      # Снаружи — ${POSTGRES_PORT}, внутри — всегда 5432.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -39,6 +40,8 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-change-me}
       PGADMIN_CONFIG_SERVER_MODE: ${PGADMIN_CONFIG_SERVER_MODE:-False}
+      # Отключаем мастер первого запуска — настройка через env.
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     ports:
       - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
     restart: unless-stopped
@@ -50,6 +53,9 @@ services:
         limits:
           cpus: '${PGADMIN_CPUS:-0.5}'
           memory: ${PGADMIN_MEMORY:-1G}
+    volumes:
+      # Сохраняем настройки, подключения и пароли между пересозданиями.
+      - pgadmin_data:/var/lib/pgadmin
     networks:
       - contactbook_network
     logging:
@@ -65,11 +71,18 @@ services:
     image: ${SOLUTION_NAME:-contactbook}-api:local
     container_name: ${SOLUTION_NAME:-contactbook}_api_container
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultDocker: Host=postgres;Port=${POSTGRES_PORT:-5432};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      # Внутри docker-сети Postgres всегда на 5432 — внешний ${POSTGRES_PORT} тут не при чём.
+      ConnectionStrings__DefaultDocker: >-
+        Host=postgres;Port=5432;Database=${POSTGRES_DB:-contactbook_db};
+        Username=${POSTGRES_USER:-contactbook_app};Password=${POSTGRES_PASSWORD:-change-me}
+      RunMigrations: ${RUN_MIGRATIONS:-true}
+      NLog__variables__consoleLogLevel: ${NLOG_LOG_LEVEL:-Information}
+      NLog__variables__fileLogLevel: ${NLOG_LOG_LEVEL:-Information}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     healthcheck:
@@ -77,11 +90,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '${API_CPUS:-1}'
+          memory: ${API_MEMORY:-1G}
+    volumes:
+      # Файловые логи NLog — на хост, чтобы читать без docker exec.
+      - ./logs/api:/app/logs
     networks:
       - contactbook_network
     logging:
@@ -96,3 +117,4 @@ networks:
 
 volumes:
   postgres_data:
+  pgadmin_data:
