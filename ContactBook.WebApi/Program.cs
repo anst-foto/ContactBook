@@ -114,7 +114,10 @@ contacts.MapGet("/", async (DataBaseContext db, string? search, CancellationToke
 
 contacts.MapGet("/{id:guid}", async (Guid id, DataBaseContext db, CancellationToken ct) =>
     {
-        ContactModel? contact = await db.Contacts.AsNoTracking().SingleOrDefaultAsync(c => c.Id == id, ct);
+        ContactModel? contact = await db.Contacts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
         return contact is null
             ? Results.NotFound()
             : Results.Ok(ToResponse(contact, ShortIdLength));
@@ -128,7 +131,10 @@ contacts.MapGet("/by-short-id/{shortId}", async (string shortId, DataBaseContext
     {
         if (string.IsNullOrWhiteSpace(shortId))
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["shortId"] = ["Обязательное поле."] });
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["shortId"] = ["Обязательное поле."]
+            });
         }
 
         string normalized = shortId.Replace("-", string.Empty).Trim().ToLowerInvariant();
@@ -151,7 +157,7 @@ contacts.MapGet("/by-short-id/{shortId}", async (string shortId, DataBaseContext
 
         List<ContactModel> matches = await db.Contacts
             .AsNoTracking()
-            .Where(c => c.Id.ToString("N").StartsWith(normalized, StringComparison.CurrentCultureIgnoreCase))
+            .Where(c => c.Id.ToString().Replace("-", "").StartsWith(normalized))
             .Take(2)
             .ToListAsync(ct);
 
@@ -173,7 +179,7 @@ contacts.MapGet("/by-short-id/{shortId}", async (string shortId, DataBaseContext
     .ProducesProblem(StatusCodes.Status404NotFound)
     .ProducesProblem(StatusCodes.Status409Conflict);
 
-contacts.MapPost("/", async (ContactCreateRequest request, DataBaseContext db, CancellationToken ct) =>
+contacts.MapPost("", async (ContactCreateRequest request, DataBaseContext db, CancellationToken ct) =>
     {
         Dictionary<string, string[]> errors = Validate(request.Name, request.Contact);
         if (errors.Count > 0)
@@ -183,7 +189,9 @@ contacts.MapPost("/", async (ContactCreateRequest request, DataBaseContext db, C
 
         ContactModel entity = new()
         {
-            Name = request.Name.Trim(), Contact = request.Contact.Trim(), Type = request.Type
+            Name = request.Name.Trim(),
+            Contact = request.Contact.Trim(),
+            Type = request.Type
         };
 
         db.Contacts.Add(entity);
@@ -208,7 +216,7 @@ contacts.MapPost("/", async (ContactCreateRequest request, DataBaseContext db, C
     .ProducesValidationProblem()
     .ProducesProblem(StatusCodes.Status409Conflict);
 
-contacts.MapPut("/", async (ContactUpdateRequest request, DataBaseContext db, CancellationToken ct) =>
+contacts.MapPut("", async (ContactUpdateRequest request, DataBaseContext db, CancellationToken ct) =>
     {
         if (request.Id == Guid.Empty)
         {
@@ -224,7 +232,9 @@ contacts.MapPut("/", async (ContactUpdateRequest request, DataBaseContext db, Ca
             return Results.ValidationProblem(errors);
         }
 
-        ContactModel? entity = await db.Contacts.FirstOrDefaultAsync(c => c.Id == request.Id, ct);
+        ContactModel? entity = await db.Contacts
+            .FirstOrDefaultAsync(c => c.Id == request.Id, ct);
+
         if (entity is null)
         {
             return Results.NotFound();
@@ -262,7 +272,9 @@ contacts.MapDelete("/{id:guid}", async (Guid id, DataBaseContext db, Cancellatio
             });
         }
 
-        ContactModel? entity = await db.Contacts.FirstOrDefaultAsync(c => c.Id == id, ct);
+        ContactModel? entity = await db.Contacts
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
         if (entity is null)
         {
             return Results.NotFound();
@@ -332,11 +344,11 @@ static bool IsUniqueViolation(DbUpdateException ex)
 
 #region DTOs
 
-internal sealed record ContactCreateRequest(string Name, string Contact, ContactType Type);
+public sealed record ContactCreateRequest(string Name, string Contact, ContactType Type);
 
-internal sealed record ContactUpdateRequest(Guid Id, string Name, string Contact, ContactType Type);
+public sealed record ContactUpdateRequest(Guid Id, string Name, string Contact, ContactType Type);
 
-internal sealed record ContactResponse(Guid Id, string ShortId, string Name, string Contact, ContactType Type);
+public sealed record ContactResponse(Guid Id, string ShortId, string Name, string Contact, ContactType Type);
 
 #endregion
 

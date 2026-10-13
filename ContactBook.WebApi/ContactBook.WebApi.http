@@ -1,5 +1,374 @@
-@BaseUrl = http://localhost:5099
+@BaseUrl = http://localhost:8080
+@ApiPrefix = /api/v1/contacts
 
-GET {{BaseUrl}}/
+### ============================================================
+### Health
+### ============================================================
 
-###
+### Проверка healthcheck — ожидаем 200 Healthy
+GET {{BaseUrl}}/health
+
+
+### ============================================================
+### Подготовка: создание тестовых данных
+### ============================================================
+
+### Создать контакт — email (Иван)
+# @name createEmail
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Иван Петров",
+  "contact": "ivan.petrov@example.com",
+  "type": "Email"
+}
+
+### Создать контакт — телефон (Мария)
+# @name createPhone
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Мария Сидорова",
+  "contact": "+7 999 123-45-67",
+  "type": "Phone"
+}
+
+### Создать контакт — email (Алексей)
+# @name createThird
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Алексей Кузнецов",
+  "contact": "alexey.k@example.com",
+  "type": "Email"
+}
+
+
+### ============================================================
+### GET — список контактов
+### ============================================================
+
+### Все контакты без фильтра — ожидаем 200, массив
+GET {{BaseUrl}}{{ApiPrefix}}
+Accept: application/json
+
+### Поиск по имени (регистронезависимо) — ожидаем 200, найдёт Ивана и Марию
+GET {{BaseUrl}}{{ApiPrefix}}?search=иван
+
+### Поиск по части имени в другом регистре — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}?search=МАРИЯ
+
+### Поиск по значению email — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}?search=example.com
+
+### Поиск по части телефона — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}?search=999
+
+### Поиск по несуществующему значению — ожидаем 200, пустой массив
+GET {{BaseUrl}}{{ApiPrefix}}?search=zzzz-not-found-zzzz
+
+### Пустой search (пробел) — ожидаем 200, полный список
+GET {{BaseUrl}}{{ApiPrefix}}?search=%20
+
+
+### ============================================================
+### GET — по полному GUID
+### ============================================================
+
+### По ID созданного email-контакта — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}/{{createEmail.response.body.$.id}}
+Accept: application/json
+
+### По ID созданного phone-контакта — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}/{{createPhone.response.body.$.id}}
+
+### Несуществующий ID — ожидаем 404
+GET {{BaseUrl}}{{ApiPrefix}}/11111111-2222-3333-4444-555555555555
+
+### Guid.Empty — ожидаем 404 (запись не найдена)
+GET {{BaseUrl}}{{ApiPrefix}}/00000000-0000-0000-0000-000000000000
+
+### Некорректный формат GUID — ожидаем 404 (маршрут не совпадёт)
+GET {{BaseUrl}}{{ApiPrefix}}/not-a-guid
+
+
+### ============================================================
+### GET — по короткому ID
+### ============================================================
+
+### Короткий ID (первые 8 символов) — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/{{createEmail.response.body.$.shortId}}
+
+### Короткий ID с заглавными буквами — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/{{createEmail.response.body.$.shortId.toUpperCase()}}
+
+### Короткий ID из 4 символов — ожидаем 200 или 409 (если префикс совпадает с несколькими)
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/{{createEmail.response.body.$.shortId.substring(0, 4)}}
+
+### Короткий ID с дефисами — дефисы игнорируются, ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/0000-0000
+
+### Слишком короткий ID (3 символа) — ожидаем 400
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/abc
+
+### Не-hex символы — ожидаем 400
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/xyzq
+
+### Пустой shortId — маршрут не совпадёт, ожидаем 404
+GET {{BaseUrl}}{{ApiPrefix}}/by-short-id/
+
+
+### ============================================================
+### POST — создание контакта
+### ============================================================
+
+### Валидный email — ожидаем 201, Location на /api/v1/contacts/{id}
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Ольга Смирнова",
+  "contact": "olga.smirnova@example.com",
+  "type": "Email"
+}
+
+### Валидный телефон — ожидаем 201
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Дмитрий Орлов",
+  "contact": "+7 916 000-11-22",
+  "type": "Phone"
+}
+
+### Дубликат по (type, contact) — ожидаем 409
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Кто-то другой",
+  "contact": "olga.smirnova@example.com",
+  "type": "Email"
+}
+
+### Пустое имя — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "",
+  "contact": "empty.name@example.com",
+  "type": "Email"
+}
+
+### Имя из пробелов — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "contact": "spaces@example.com",
+  "type": "Email"
+}
+
+### Пустой contact — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Без контакта",
+  "contact": "",
+  "type": "Email"
+}
+
+### Имя > 200 символов — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "{{'A'.repeat(201)}}",
+  "contact": "long.name@example.com",
+  "type": "Email"
+}
+
+### Contact > 320 символов — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Длинный контакт",
+  "contact": "{{'b'.repeat(321)}}@example.com",
+  "type": "Email"
+}
+
+### Невалидный enum Type — ожидаем 400 (модель binding)
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Плохой тип",
+  "contact": "bad-type@example.com",
+  "type": "Telegram"
+}
+
+### Отсутствует обязательное поле name — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "contact": "no-name@example.com",
+  "type": "Email"
+}
+
+
+### ============================================================
+### PUT — обновление контакта (ID в теле)
+### ============================================================
+
+### Валидное обновление email-контакта — ожидаем 200
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "id": "{{createEmail.response.body.$.id}}",
+  "name": "Иван Петров (обновлён)",
+  "contact": "ivan.new@example.com",
+  "type": "Email"
+}
+
+### Обновление с Guid.Empty — ожидаем 400
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "name": "Кто-то",
+  "contact": "someone@example.com",
+  "type": "Email"
+}
+
+### Обновление несуществующего ID — ожидаем 404
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "id": "11111111-2222-3333-4444-555555555555",
+  "name": "Призрак",
+  "contact": "ghost@example.com",
+  "type": "Email"
+}
+
+### Обновление с пустым именем — ожидаем 400
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "id": "{{createPhone.response.body.$.id}}",
+  "name": "",
+  "contact": "+7 999 000-00-00",
+  "type": "Phone"
+}
+
+### Обновление с дублирующимся (type, contact) — ожидаем 409
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "id": "{{createThird.response.body.$.id}}",
+  "name": "Алексей Кузнецов",
+  "contact": "ivan.new@example.com",
+  "type": "Email"
+}
+
+### Смена типа Email → Phone — ожидаем 200
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "id": "{{createThird.response.body.$.id}}",
+  "name": "Алексей Кузнецов",
+  "contact": "+7 495 000-00-00",
+  "type": "Phone"
+}
+
+### Отсутствует id в теле — ожидаем 400 (обязательное поле)
+PUT {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{
+  "name": "Без ID",
+  "contact": "no-id@example.com",
+  "type": "Email"
+}
+
+
+### ============================================================
+### DELETE — удаление контакта
+### ============================================================
+
+### Удаление несуществующего ID — ожидаем 404
+DELETE {{BaseUrl}}{{ApiPrefix}}/11111111-2222-3333-4444-555555555555
+
+### Удаление с Guid.Empty — ожидаем 400
+DELETE {{BaseUrl}}{{ApiPrefix}}/00000000-0000-0000-0000-000000000000
+
+### Удаление phone-контакта — ожидаем 204
+DELETE {{BaseUrl}}{{ApiPrefix}}/{{createPhone.response.body.$.id}}
+
+### Повторное удаление того же ID — ожидаем 404
+DELETE {{BaseUrl}}{{ApiPrefix}}/{{createPhone.response.body.$.id}}
+
+### Удаление email-контакта — ожидаем 204
+DELETE {{BaseUrl}}{{ApiPrefix}}/{{createEmail.response.body.$.id}}
+
+### Удаление третьего контакта — ожидаем 204
+DELETE {{BaseUrl}}{{ApiPrefix}}/{{createThird.response.body.$.id}}
+
+
+### ============================================================
+### Проверка после удаления
+### ============================================================
+
+### Список должен быть пустым (или без удалённых) — ожидаем 200
+GET {{BaseUrl}}{{ApiPrefix}}
+
+### Поиск по удалённому имени — ожидаем 200, пустой массив
+GET {{BaseUrl}}{{ApiPrefix}}?search=иван
+
+### Получить по удалённому ID — ожидаем 404
+GET {{BaseUrl}}{{ApiPrefix}}/{{createEmail.response.body.$.id}}
+
+
+### ============================================================
+### Проверки маршрутизации и методов
+### ============================================================
+
+### DELETE на коллекцию — ожидаем 405
+DELETE {{BaseUrl}}{{ApiPrefix}}
+
+### PATCH на коллекцию — ожидаем 405 (метод не зарегистрирован)
+PATCH {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{}
+
+### POST с невалидным JSON — ожидаем 400
+POST {{BaseUrl}}{{ApiPrefix}}
+Content-Type: application/json
+
+{ this is not valid json }
+
+### POST без Content-Type — ожидаем 415
+POST {{BaseUrl}}{{ApiPrefix}}
+
+{ "name": "Test", "contact": "t@t", "type": "Email" }
+
+### GET по неверному префиксу — ожидаем 404
+GET {{BaseUrl}}/api/v2/contacts
+
+### GET без версии — ожидаем 404
+GET {{BaseUrl}}/api/contacts
