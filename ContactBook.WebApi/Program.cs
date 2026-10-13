@@ -69,6 +69,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerDocumentation();
 }
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapHealthChecks("/health");
 
 #endregion
@@ -293,6 +296,8 @@ contacts.MapDelete("/{id:guid}", async (Guid id, DataBaseContext db, Cancellatio
 #endregion
 
 #region Run
+
+app.MapFallbackToFile("index.html");
 
 await app.RunAsync();
 

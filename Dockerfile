@@ -1,5 +1,15 @@
 # syntax=docker/dockerfile:1
 
+# --- Frontend build ---
+FROM node:22-alpine AS frontend-build
+WORKDIR /frontend
+COPY Frontend/package*.json ./
+RUN npm install
+COPY Frontend/ ./
+RUN npm run build
+# Артефакты в /ContactBook.WebApi/wwwroot/
+
+# --- Backend build ---
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
@@ -7,6 +17,8 @@ COPY ["ContactBook.WebApi/ContactBook.WebApi.csproj", "ContactBook.WebApi/"]
 RUN dotnet restore "ContactBook.WebApi/ContactBook.WebApi.csproj"
 
 COPY . .
+COPY --from=frontend-build /ContactBook.WebApi/wwwroot ./ContactBook.WebApi/wwwroot
+
 WORKDIR "/src/ContactBook.WebApi"
 RUN dotnet publish "ContactBook.WebApi.csproj" \
     --configuration Release \
@@ -14,6 +26,7 @@ RUN dotnet publish "ContactBook.WebApi.csproj" \
     --no-restore \
     --property:UseAppHost=false
 
+# --- Runtime ---
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 

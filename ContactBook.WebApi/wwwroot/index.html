@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ContactBook</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>ContactBook</h1>
+      <p class="small">Управление контактами</p>
+    </header>
+    <main class="app-main">
+      <section class="card">
+        <h2>Создать контакт</h2>
+        <form id="create-form" novalidate>
+          <div class="field">
+            <label for="create-name">Имя</label>
+            <input id="create-name" type="text" name="name" required maxlength="200" placeholder="Иван Петров">
+          </div>
+          <div class="field">
+            <label for="create-contact">Контакт</label>
+            <input id="create-contact" type="text" name="contact" required maxlength="320" placeholder="ivan@example.com или +7 999 123-45-67">
+          </div>
+          <div class="field">
+            <label for="create-type">Тип</label>
+            <select id="create-type" name="type" required>
+              <option value="Email">Email</option>
+              <option value="Phone">Телефон</option>
+            </select>
+          </div>
+          <div class="message" id="create-message"></div>
+          <button class="btn btn-primary" type="submit">Создать</button>
+        </form>
+      </section>
+      <section class="card">
+        <h2>Поиск</h2>
+        <form id="search-form">
+          <div class="search-row">
+            <input id="search-input" type="search" placeholder="Поиск по имени или контакту...">
+            <button class="btn" type="submit">Найти</button>
+            <button class="btn btn-ghost" id="search-clear" type="button">Сбросить</button>
+          </div>
+        </form>
+      </section>
+      <section class="card">
+        <h2>Контакты</h2>
+        <div class="empty" id="list-loading">Загрузка...</div>
+        <div class="empty hidden" id="list-empty">Контактов нет</div>
+        <ul class="list hidden" id="contacts-list"></ul>
+      </section>
+    </main>
+    <dialog class="dialog" id="edit-dialog">
+      <form id="edit-form" novalidate>
+        <h2>Редактировать контакт</h2>
+        <input type="hidden" name="id">
+        <div class="field">
+          <label for="edit-name">Имя</label>
+          <input id="edit-name" type="text" name="name" required maxlength="200">
+        </div>
+        <div class="field">
+          <label for="edit-contact">Контакт</label>
+          <input id="edit-contact" type="text" name="contact" required maxlength="320">
+        </div>
+        <div class="field">
+          <label for="edit-type">Тип</label>
+          <select id="edit-type" name="type" required>
+            <option value="Email">Email</option>
+            <option value="Phone">Телефон</option>
+          </select>
+        </div>
+        <div class="message" id="edit-message"></div>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" id="edit-cancel" type="button">Отмена</button>
+          <button class="btn btn-primary" type="submit">Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/app.js" defer></script>
+  </body>
+</html>

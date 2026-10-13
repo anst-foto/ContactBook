@@ -1,0 +1,65 @@
+doctype html
+html(lang="ru")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    title ContactBook
+    link(rel="stylesheet" href="/styles.css")
+  body
+    header.app-header
+      h1 ContactBook
+      p.small Управление контактами
+
+    main.app-main
+      section.card
+        h2 Создать контакт
+        form#create-form(novalidate)
+          div.field
+            label(for="create-name") Имя
+            input#create-name(type="text" name="name" required maxlength="200" placeholder="Иван Петров")
+          div.field
+            label(for="create-contact") Контакт
+            input#create-contact(type="text" name="contact" required maxlength="320" placeholder="ivan@example.com или +7 999 123-45-67")
+          div.field
+            label(for="create-type") Тип
+            select#create-type(name="type" required)
+              option(value="Email") Email
+              option(value="Phone") Телефон
+          div#create-message.message
+          button.btn.btn-primary(type="submit") Создать
+
+      section.card
+        h2 Поиск
+        form#search-form
+          div.search-row
+            input#search-input(type="search" placeholder="Поиск по имени или контакту...")
+            button.btn(type="submit") Найти
+            button#search-clear.btn.btn-ghost(type="button") Сбросить
+
+      section.card
+        h2 Контакты
+        div#list-loading.empty Загрузка...
+        div#list-empty.empty.hidden Контактов нет
+        ul#contacts-list.list.hidden
+
+    dialog#edit-dialog.dialog
+      form#edit-form(novalidate)
+        h2 Редактировать контакт
+        input(type="hidden" name="id")
+        div.field
+          label(for="edit-name") Имя
+          input#edit-name(type="text" name="name" required maxlength="200")
+        div.field
+          label(for="edit-contact") Контакт
+          input#edit-contact(type="text" name="contact" required maxlength="320")
+        div.field
+          label(for="edit-type") Тип
+          select#edit-type(name="type" required)
+            option(value="Email") Email
+            option(value="Phone") Телефон
+        div#edit-message.message
+        div.dialog-actions
+          button#edit-cancel.btn.btn-ghost(type="button") Отмена
+          button.btn.btn-primary(type="submit") Сохранить
+
+    script(type="module" src="/app.js" defer)
