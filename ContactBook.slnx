@@ -1,9 +1,14 @@
 <Solution>
+  <Folder Name="/docker/">
+    <File Path=".env" />
+    <File Path=".env.example" />
+    <File Path="docker-compose.yml" />
+  </Folder>
   <Folder Name="/git/">
-    <File Path=".gitattributes"/>
-    <File Path=".gitignore"/>
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
   </Folder>
   <Folder Name="/others/">
-    <File Path=".editorconfig"/>
+    <File Path=".editorconfig" />
   </Folder>
 </Solution>

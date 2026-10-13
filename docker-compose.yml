@@ -1,0 +1,62 @@
+services:
+  postgres:
+    container_name: ${SOLUTION_NAME}_db_container
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    stop_grace_period: 1m
+    deploy:
+      resources:
+        limits:
+          cpus: '${POSTGRES_CPUS}'
+          memory: ${POSTGRES_MEMORY}
+    volumes:
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - ${SOLUTION_NAME}_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pgadmin:
+    container_name: ${SOLUTION_NAME}_pgadmin_container
+    image: dpage/pgadmin4:9.18
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: ${PGADMIN_CONFIG_SERVER_MODE}
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT}:80"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '${PGADMIN_CPUS}'
+          memory: ${PGADMIN_MEMORY}
+    networks:
+      - ${SOLUTION_NAME}_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  contactbook_network:
+    driver: bridge
